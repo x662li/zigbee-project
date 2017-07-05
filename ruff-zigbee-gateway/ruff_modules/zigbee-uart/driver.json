@@ -1,0 +1,30 @@
+{
+    "models": [
+        "zigbee-uart"
+    ],
+    "inputs": {
+        "uart": {
+            "type": "uart",
+            "args": {
+	      "baudRate": {
+                    "type": "number",
+                    "default": 38400
+                },
+                "stopBits": {
+                    "type": "number",
+                    "default": 1
+                },
+                "dataBits": {
+                    "type": "number",
+                    "default": 8
+                },
+                "parity": {
+                    "type": "string",
+                    "default": "none"
+                },
+                "flowControl": "none"
+
+            }
+        }
+    }
+}

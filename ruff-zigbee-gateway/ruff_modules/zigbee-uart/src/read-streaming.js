@@ -1,0 +1,36 @@
+/*!
+ * Copyright (c) 2016 Nanchao Inc.
+ * All rights reserved.
+ */
+
+'use strict';
+
+var util = require('util');
+var EventEmitter = require('events');
+
+function ReadStreaming(obj) {
+    EventEmitter.call(this);
+    this._read = obj.read.bind(obj);
+}
+
+util.inherits(ReadStreaming, EventEmitter);
+
+ReadStreaming.prototype.start = function () {
+    var that = this;
+
+    setImmediate(readNext);
+
+    function readNext() {
+        that._read(function (error, data) {
+            if (error) {
+                that.emit('error', error);
+            } else {
+                console.log('read-streaming RAW READ Out:', data);
+                that.emit('data', data);
+                setImmediate(readNext);
+            }
+        });
+    }
+};
+
+module.exports = ReadStreaming;
