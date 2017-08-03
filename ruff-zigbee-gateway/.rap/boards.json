@@ -1,0 +1,10 @@
+{
+    "ruff": {
+        "boards": {
+            "sg-mbd-v1": {
+                "version": "1",
+                "isActive": true
+            }
+        }
+    }
+}

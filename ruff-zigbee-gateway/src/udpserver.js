@@ -7,16 +7,14 @@ var zigbee = require('./zigbee_utils.js');
 var fileList = require('./lists.js');
 var PORT = 0;
 var GATEWAY_ID = 0;
-
-
 var naming = false
 var count = 0;
 
 function parse(msg) {
-
   var deviceID;
   var IEEEAddress;
 
+  // ----------- parse messages -------------
   if (msg.cmd == 'ping') {
     return parse_cmd_ping(msg);
   } else if (msg.cmd == 'startnetwork') {
@@ -24,74 +22,138 @@ function parse(msg) {
     return {
       cmd: 'startnetwork_rsp'
     };
-  } else if (msg.cmd == 'clean') {
-    fileList.resetList(fileList.getList(fileList.deviceList));
-    fileList.writeList(fileList.DEVICE_LIST, fileList.getList(fileList.deviceList));
+  } else if (msg.cmd == 'cleandevicelist') {
+    fileList.resetList('deviceList');
+    return {
+      cmd: 'clean_rsp'
+    };
+  } else if (msg.cmd == 'cleanrelationlist') {
+    fileList.resetList('relationList');
     return {
       cmd: 'clean_rsp'
     };
   } else if (msg.cmd == 'permitjoining') {
-    // 允许设备加入
     zigbee.permitJoiningRequest();
-
     return {
       cmd: 'permitjoining_rsp'
     };
-  } else if (msg.cmd == 'list') {
-
-    console.log('--- pre view list: '+ fileList.getList(fileList.deviceList));
-
+  } else if (msg.cmd == 'listdevices') {
     return {
-      cmd: 'list_rsp',
-      content: JSON.stringify(fileList.getList(fileList.deviceList))
+      cmd: 'listdevices_rsp',
+      content: JSON.stringify(fileList.getList('deviceList'))
     };
-  }
-
-  // additional commands
-  else if (msg.cmd == 'onlinedevice') {
-
-    manager.removeOnlineDevices();
-
-    manager.setOnlineDevices();
-
-    console.log('--- onlineDevices: ' + manager.getOnlineDevices());
+  } else if (msg.cmd == 'listrelations') {
+    return {
+      cmd: 'listrelations_rsp',
+      content: JSON.stringify(fileList.getList('relationList'))
+    };
+  } else if (msg.cmd == 'savedevicelist') {
+    fileList.writeList(fileList.DEVICE_LIST, 'deviceList');
+    return {
+      cmd: 'savedevicelist_rsp'
+    }
+  } else if (msg.cmd == 'saverelationlist') {
+    fileList.writeList(fileList.RELATION_LIST, 'relationList');
+    return {
+      cmd: 'saverelationlist_rsp'
+    }
+  } else if (msg.cmd == 'onlinedevice') {
     return {
       cmd: 'online_device_rsp',
-      content: JSON.stringify(manager.getOnlineDevices())
+      content: JSON.stringify(fileList.getListCopy('deviceList'))
     };
-  }
-  // naming ------------------------------
-  else if(msg.cmd == 'name'){
-    console.log('===IEEEaddr: ' + msg.IEEEAddress );
+  } else if (msg.cmd == 'name') {
+    console.log('===IEEEaddr: ' + msg.IEEEAddress);
     console.log('===name: ' + msg.name);
-
     manager.setName(msg.name, msg.IEEEAddress);
-
-    return{
+    return {
       cmd: 'name_rsp'
     };
-  }
-
-  else if(msg.cmd == 'relation'){
+  } else if (msg.cmd == 'relation') {
     console.log('===relation name: ' + msg.relationName);
     console.log('===emitter short address: ' + msg.emitterShort);
     console.log('===receiver short address: ' + msg.receiverShort);
 
-    manager.setRelation(msg.relationName, msg.emitterShort, msg.receiverShort);
-
-    return{
+    var eButton = null;
+    var rButton = null;
+    if (msg.emitterButton) {
+      console.log('===emitter button: ' + msg.emitterButton);
+      if (msg.emitterButton == 'left' || msg.emitterButton == 'single') {
+        eButton = 'left';
+      } else if (msg.emitterButton == 'right') {
+        eButton = 'right';
+      }
+    }
+    if (msg.receiverButton) {
+      console.log('===receiver button: ' + msg.receiverButton);
+      if (msg.receiverButton == 'left' || msg.receiverButton == 'single') {
+        rButton = 'left';
+      } else if (msg.receiverButton == 'right') {
+        rButton = 'right';
+      }
+    }
+    manager.setRelation(msg.relationName, msg.emitterShort, msg.receiverShort, eButton, rButton);
+    return {
       cmd: 'relation_rsp'
     };
+  } else if (msg.cmd == 'removedevice') {
+    console.log('--- remove device IEEE: ' + msg.IEEEAddress);
+    fileList.removeDevice(msg.IEEEAddress);
+    return {
+      cmd: 'remove_rsp'
+    };
+  } else if (msg.cmd == 'removerelation') {
+    console.log('--- remove relation name: ' + msg.name);
+    for (var i in fileList.getList('relationList')) {
+      if (fileList.getListItem('relationList', i).name == msg.name) {
+        fileList.getList('relationList').splice(i, i + 1);
+      }
+    }
+    return {
+      cmd: 'remove_rsp'
+    };
+  } else if (msg.cmd == 'checkstatus') {
+    console.log('check device with short address: ' + msg.shortAddress);
+    var endPoint = 0x2;
+    if (msg.button == 'left') {
+      endPoint = 0x2;
+    } else if (msg.button == 'right') {
+      endPoint = 0x3;
+    }
+    zigbee.checkLightStatus(msg.shortAddress, endPoint);
+    return {
+      cmd: 'checkstatus_rsp'
+    };
+  } else if (msg.cmd == 'control') {
+    console.log('---- control device: ' + msg.receiverShort + '  ' + msg.receiverButton + '  state: ' + msg.command);
+    var endPoint = 0x2;
+    if (msg.receiverButton == 'left') {
+      endPoint = 0x2;
+    } else if (msg.receiverButton == 'right') {
+      endPoint = 0x3;
+    }
+    if (msg.command == 'on') {
+      zigbee.custTurnLightOn(msg.receiverShort, endPoint);
+    } else if (msg.command == 'off') {
+      zigbee.custTurnLightOff(msg.receiverShort, endPoint);
+    }
+    return {
+      cmd: 'control_rsp'
+    };
 
-  }
-  // ------------------------------------
-  else { // unknown command
+    /*
+
+    add more command if available 
+
+    */
+
+  } else { // unknown command
     return {
       cmd: 'unknown_cmd'
     };
   }
-
 }
+// --------------------------------------
 
 function parse_cmd_ping(msg) {
   var feedback = {};
@@ -100,15 +162,13 @@ function parse_cmd_ping(msg) {
   return feedback;
 }
 
-
-server.on("error", function(err) {
+server.on("error", function (err) {
   console.log("server error:\n" + err.stack);
   server.close();
 });
 
-server.on("message", function(msg, rinfo) {
-  console.log("server got: " + msg + " from " +
-    rinfo.address + ":" + rinfo.port);
+server.on("message", function (msg, rinfo) {
+  console.log("server got: " + msg + " from " + rinfo.address + ":" + rinfo.port);
   var msgObj;
 
   try {
@@ -119,39 +179,30 @@ server.on("message", function(msg, rinfo) {
     console.log(e);
     return;
   }
-
-  console.log(msgObj.cmd);
-
   var feedback = parse(msgObj);
-
   var msg2 = JSON.stringify(feedback);
-
   server.send(msg2,
     0,
     msg2.length,
     rinfo.port,
     rinfo.address,
-    function(err, bytes) {
+    function (err, bytes) {
       if (err)
         throw err;
     }
   );
-
 });
 
-server.on("listening", function() {
+server.on("listening", function () {
   var address = server.address();
   console.log("server listening " +
     address.address + ":" + address.port);
 });
 
-
 function start(options) {
   PORT = options.port || 33333;
   GATEWAY_ID = options.id || 'gateway_01';
-
   server.bind(PORT);
-
 }
 
 

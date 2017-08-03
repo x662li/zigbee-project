@@ -1,16 +1,17 @@
 /**
  * Created by SorosLiu on 16/11/29.
+ * Modified by XinyangLi on 17/07/28
  */
+
 'use strict';
 var uart = $('#zuart');
 var decode = require('./interpreter.js');
 var fileList = require('./lists.js');
 
-
 function _writeCmd(cmdType, msg) {
     var cmd = decode.pack(cmdType, msg);
+
     if (uart) {
-        console.log('--- uart: ' + uart);
         uart.write(Buffer.from(cmd));
     } else {
         console.log('zigbee_utils, empty uart object');
@@ -79,67 +80,84 @@ function permitJoiningRequest() {
     _writeCmd(0x49, msg);
 }
 
-function turnLightOn() {
-    console.log('turn light on');
-    // TODO short addressES
-    var devices = fileList.getList(fileList.deviceList);
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x1]);
-    if (devices.length !== 0) {
-        msg.writeUInt16BE(devices[0].shortAddress, 1);
-    }
-    _writeCmd(0x92, msg);
+function IEEEAddressRequest(shortAddr) {
+    console.log('IEEE address request');
+    var msg = new Buffer([]);
 }
 
-function turnLightOff() {
-    console.log('turn light off');
-    // TODO short addressES
-    var devices = ileList.getList(fileList.deviceList);
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x0]);
-    if (devices.length !== 0) {
-        msg.writeUInt16BE(devices[0].shortAddress, 1);
-    }
-    _writeCmd(0x92, msg);
+function checkLightStatus(shortAddress, EP) {
+    console.log('ask light status');
+    // address mode -- short addr -- sep -- dep -- clusterID (16) -- dir -- manu spec -- manu ID (16) -- #attri -- addriID (16)
+    var msg = new Buffer([0x02, 0xff, 0xff, 0x01, EP, 0x00, 0x06, 0x00, 0x00, 0x00, 0x11, 0x01, 0x00, 0x00]);
+    msg.writeUInt16BE(shortAddress, 1);
+    _writeCmd(0x0100, msg);
 }
 
-function toggleLight() {
-    console.log('toggle light');
-    var devices = ileList.getList(fileList.deviceList);
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x2]);
-    if (devices.length !== 0) {
-        msg.writeUInt16BE(devices[0].shortAddress, 1);
-    }
-    _writeCmd(0x92, msg);
-}
+// default command for on/off
+// function turnLightOn() {
+//     console.log('turn light on');
+//     // TODO short addressES
+//     var devices = fileList.getList(fileList.deviceList);
+//     var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x1]);
+//     if (devices.length !== 0) {
+//         msg.writeUInt16BE(devices[0].shortAddress, 1);
+//     }
+//     _writeCmd(0x92, msg);
+// }
 
-function listDevices() {
+// function turnLightOff() {
+//     console.log('turn light off');
+//     // TODO short addressES
+//     var devices = ileList.getList(fileList.deviceList);
+//     var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x0]);
+//     if (devices.length !== 0) {
+//         msg.writeUInt16BE(devices[0].shortAddress, 1);
+//     }
+//     _writeCmd(0x92, msg);
+// }
 
-}
+// function toggleLight() {
+//     console.log('toggle light');
+//     var devices = ileList.getList(fileList.deviceList);
+//     var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x2]);
+//     if (devices.length !== 0) {
+//         msg.writeUInt16BE(devices[0].shortAddress, 1);
+//     }
+//     _writeCmd(0x92, msg);
+// }
 
 // added by XinyangLi
-function custTurnLightOn(shortAddress) {
+function custTurnLightOn(shortAddress, endPoint) {
     console.log('turn light on');
+
+    console.log('turn light on, end point sent: ' + endPoint);
+
     // TODO short addressES
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x1]);
-
+    if (!endPoint) {
+        endPoint = 0x2;
+    }
+    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, endPoint, 0x1]);
     msg.writeUInt16BE(shortAddress, 1);
-
     _writeCmd(0x92, msg);
 }
 
-function custTurnLightOff(shortAddress) {
+function custTurnLightOff(shortAddress, endPoint) {
     console.log('turn light off');
+
+    console.log('turn light off, end point sent: ' + endPoint);
     // TODO short addressES
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x0]);
-
+    if (!endPoint) {
+        endPoint = 0x2;
+    }
+    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, endPoint, 0x0]);
     msg.writeUInt16BE(shortAddress, 1);
-
     _writeCmd(0x92, msg);
 }
 
-function custToggleLight(shortAddress) {
+function custToggleLight(shortAddress, endPoint) {
     console.log('toggle light');
     console.log('--- short address: ' + shortAddress);
-    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x1, 0x2]);
+    var msg = new Buffer([0x2, 0xff, 0xff, 0x1, 0x2, 0x2]);
     msg.writeUInt16BE(shortAddress, 1);
     _writeCmd(0x92, msg);
 }
@@ -154,9 +172,9 @@ function init(portObj) {
 module.exports = {
     uart: uart,
     init: init,
-    turnLightOn: turnLightOn,
-    turnLightOff: turnLightOff,
-    toggleLight: toggleLight,
+    // turnLightOn: turnLightOn,
+    // turnLightOff: turnLightOff,
+    // toggleLight: toggleLight,
     getVersion: getVersion,
     reset: reset,
     setExtenedPANID: setExtendedPANID,
@@ -168,21 +186,6 @@ module.exports = {
     permitJoiningRequest: permitJoiningRequest,
     custTurnLightOn: custTurnLightOn,
     custToggleLight: custToggleLight,
-    custTurnLightOff: custTurnLightOff
-
+    custTurnLightOff: custTurnLightOff,
+    checkLightStatus: checkLightStatus
 }
-
-// turnLightOn = turnLightOn;
-// turnLightOff = turnLightOff;
-// toggleLight = toggleLight;
-// getVersion = getVersion;
-// reset = reset;
-// setExtenedPANID = setExtendedPANID;
-// setChannelMask = setChannelMask;
-// setSecurityStateAndKey = setSecurityStateAndKey;
-// setDeviceType = setDeviceType;
-// startNetwork = startNetwork;
-// startNetworkScan = startNetworkScan;
-// permitJoiningRequest = permitJoiningRequest;
-// custTurnLightOn = custTurnLightOn;
-// custToggleLight = custToggleLight;

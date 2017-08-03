@@ -10,7 +10,9 @@
             "*": "*"
         },
         "dependencies": {
-            "zigbee-uart": "*"
-        }
+            "zigbee-uart": "*",
+            "firmata": "*"
+        },
+        "version": 1
     }
 }

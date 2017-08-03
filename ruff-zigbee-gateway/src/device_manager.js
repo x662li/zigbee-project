@@ -1,3 +1,7 @@
+/* 
+* created by XinyangLi 17/6/1
+*/
+
 'use strict';
 var util = require('util');
 var fs = require('fs');
@@ -11,64 +15,44 @@ var _ = require('./underscore.js');
 var RelationClass = require('./relation.js');
 var Relation = RelationClass.Relation;
 
-//var server = require('./udpserver.js');
-
 // ------------------------------------
-
 var myDevice = {};
 var newRelation = {};
 var groupArray = [];
-var onlineDevices = [];
 var onlineDev = {};
-// ----- device management -------------------------------
-function getType(macCapability) {
 
-  if (macCapability == '10000000' || macCapability == '10000011') {
-    return DeviceClass.SWITCH;
-  } else if (macCapability == '10001110' || macCapability == '10000100' || macCapability == '00010010') {
-    return DeviceClass.SOCKET;
-  }
-  // add more
-  else {
-    console.log('unidentified device type');
-    return DeviceClass.UNKNOWN;
-  }
-}
-// ---------------- find device ------------------
+// ---------------- searching functions ------------------
+
+// find device through short address from message
 function findDeviceShort(msg, targetList) {
-
-
-  var obj = _.find(targetList, function(dev) {
-    //console.log('--- dev Short: ' + dev.shortAddress);
+  var obj = _.find(targetList, function (dev) {
     return dev.shortAddress == msg.shortAddress;
   });
   return obj;
 }
-
+// find device through long address from message
 function findDeviceLong(msg, targetList) {
-
-  var obj = _.find(targetList, function(dev) {
+  var obj = _.find(targetList, function (dev) {
     return dev.IEEEAddress == msg.IEEEAddress;
   });
   return obj;
 }
-
+// find device through device ID from devicelist
 function findDeviceID(deviceID, targetList) {
-  var obj = _.find(targetList, function(dev) {
+  var obj = _.find(targetList, function (dev) {
     return dev.deviceID == deviceID;
   });
   return obj;
 }
-
+// find device through short address from deviceList
 function findDeviceShortAddress(shortAddr, targetList) {
-  var obj = _.find(targetList, function(dev) {
-    return dev.shortAddress = shortAddr;
+  var obj = _.find(targetList, function (dev) {
+    return dev.shortAddress == shortAddr;
   });
   return obj;
 }
 
 function findDevice(msg, targetList, type) {
-
   if (type == 'ID') {
     return findDeviceID(msg, targetList);
   } else if (type == 'shortAddress') {
@@ -81,120 +65,81 @@ function findDevice(msg, targetList, type) {
     }
   }
 }
-
 // ------------------------------------------------
+
+// new device
 function newDevice(msg) {
-
   console.log("--- IEEEADDR: " + msg.IEEEAddress);
-
+  // create new device instance
   myDevice = new Device({
     shortAddress: msg.shortAddress,
     IEEEAddress: msg.IEEEAddress,
-    type: getType(msg.macCapability),
+    type: DeviceClass.UNKNOWN,
     online: true
   });
   // push device into list
-  console.log('Push new device into the deviceList');
-
   if (myDevice.IEEEAddress !== '0x0000000000000000') {
     console.log('Push new device into the deviceList');
-    fileList.pushDevice(myDevice, fileList.deviceList);
-    console.log('--- device list after push: ' + fileList.deviceList);
-
+    fileList.pushDevice(myDevice, 'deviceList');
   } else {
     console.log('--- invalid IEEEaddress, can not be added');
     myDevice = {};
   }
 }
 
-// ====== interfaces for client control =================
 
+// ---------------- usr interface functions ----------------
+
+// set device name
 function setName(deviceID, IEEEAddress) {
-
   var check = 0;
-  for (var i in fileList.deviceList) {
-    if (fileList.deviceList[i].IEEEAddress == IEEEAddress) {
-      fileList.deviceList[i].deviceID = deviceID;
+  for (var i in fileList.getList('deviceList')) {
+    if (fileList.getListItem('deviceList', i).IEEEAddress == IEEEAddress) {
+      fileList.getListItem('deviceList', i).deviceID = deviceID;
       check = 1;
     }
   }
-
   if (check === 0) {
     console.log('can not find device to be named');
     check = 0;
   } else {
-    fileList.writeList(fileList.DEVICE_LIST, fileList.deviceList);
-    console.log('name has been set');
+    console.log('name set already');
   }
 }
+// create new relation
+function setRelation(relationName, eShort, rShort, ebutton, rbutton) {
 
-// function setGroup(groupName){
-//   for(var i in groupArray){
-//     groupArray[i].groupName.push(groupName);
-//     if(i !== 0){
-//       setRelation('groupName' + i, groupArray[0].shortAddress, groupArray[i].shortAddress);
-//     }
-//   }
-//   console.log('group: ' + groupName + ' been set');
-// }
-//
-// // 注：数组的第一个（0)是emitter，其他都是receiver
-// function pushGroupArray(shortAddress){
-//   groupArray.push(groupArray);
-// }
-
-// ---------- show online devices --------
-
-function getOnlineDevices(){
-  console.log('--- get online device list: ' + onlineDevices);
-  return onlineDevices;
-}
-
-function setOnlineDevices() {
-
-  console.log('--- setOnlineDevices: ' + fileList.deviceList);
-
-  for (var i in fileList.deviceList) {
-    onlineDev = new Device({
-      deviceID: fileList.deviceList[i].deviceID,
-      shortAddress: fileList.deviceList[i].shortAddress,
-      state: fileList.deviceList[i].state
-    });
-
-    console.log('--- set online device obj: ' + onlineDev);
-    onlineDevices.push(onlineDev);
+  if (ebutton == 'left') {
+    ebutton = RelationClass.LEFT_EP_SWITCH;
+  } else if (ebutton == 'right') {
+    ebutton = RelationClass.RIGHT_EP_SWITCH;
   }
-}
 
-function removeOnlineDevices() {
-  onlineDevices = [];
-}
+  if (rbutton == 'left') {
+    rbutton = RelationClass.LEFT_EP_SOCKET;
+  } else if (rbutton == 'right') {
+    rbutton = RelationClass.RIGHT_EP_SOCKET;
+  }
 
-// ------ create new relation --------
-function setRelation(relationName, eShort, rShort) {
-
-  var emitterObj = _.find(fileList.deviceList, function(dev) {
+  var emitterObj = _.find(fileList.getList('deviceList'), function (dev) {
     return dev.shortAddress == eShort;
   });
-
-  var receiverObj = _.find(fileList.deviceList, function(dev) {
+  var receiverObj = _.find(fileList.getList('deviceList'), function (dev) {
     return dev.shortAddress == rShort;
   });
 
   if (emitterObj && receiverObj) {
-
     newRelation = new Relation({
       name: relationName,
       emitterShort: eShort,
-      receiverShort: rShort
+      receiverShort: rShort,
+      eEP: ebutton,
+      rEP: rbutton
     });
-
     console.log('--- relation update: ' + util.inspect(newRelation, {
       depth: 12
     }));
-
-    fileList.relationList.push(newRelation);
-    fileList.writeList(fileList.RELATION_LIST, fileList.relationList);
+    fileList.getList('relationList').push(newRelation);
   } else if (!emitterObj) {
     console.log('can not find emitter with short address: ' + eShort);
   } else if (!receiverObj) {
@@ -205,7 +150,7 @@ function setRelation(relationName, eShort, rShort) {
 }
 // ----------------------------------------
 
-// =======================================================
+// ---------- functions for reading messages -----------
 
 function leaveDevice(obj) {
   console.log('--- print leave obj');
@@ -213,10 +158,7 @@ function leaveDevice(obj) {
 
   if (obj !== undefined) {
     obj.online = false;
-    fileList.removeDevice(fileList.deviceList, obj.IEEEAddress);
-    fileList.writeList(fileList.DEVICE_LIST, fileList.deviceList);
-
-
+    fileList.removeDevice(obj.IEEEAddress);
   } else {
     console.log('leave obj does not exist in list');
   }
@@ -231,7 +173,6 @@ function announceDevice(obj, msg, myDevice) {
     console.log('Could not find obj in deviceList');
     // new device instance
     newDevice(msg);
-    fileList.writeList(fileList.DEVICE_LIST, fileList.deviceList);
   }
 }
 
@@ -246,60 +187,95 @@ function attributeReportDevice(obj, msg, myDevice) {
 }
 
 function attributeControl(msg) {
+
+  var relationsToTrigger = [];
+  var DELAY_TIME = 500;
+
   switch (msg.clusterID) {
-
     case '0x0006':
-      console.log('--- cluster ID 0x0006 identified');
+      for (var i in fileList.getList('relationList')) {
 
-      for (var i in fileList.relationList) {
-        if (fileList.relationList[i].emitterShort == msg.shortAddress) {
-          console.log('enter attribute trigger');
+        var relation = fileList.getListItem('relationList', i);
 
-          var obj = findDevice(fileList.relationList[i].receiverShort, fileList.deviceList, 'shortAddress');
+        if (relation.emitterShort == msg.shortAddress && relation.eEP == msg.endPoint) {
 
-          console.log('=== receiver short: ' + fileList.relationList[i].receiverShort);
 
-          if (obj && obj.state == DeviceClass.OFF) {
-            console.log('--- light on triggered');
-            zigbee.custTurnLightOn(fileList.relationList[i].receiverShort);
-            obj.state = DeviceClass.ON;
-          } else if (obj && obj.state == DeviceClass.ON) {
-            console.log('--- light off triggered');
-            zigbee.custTurnLightOff(fileList.relationList[i].receiverShort);
-            obj.state = DeviceClass.OFF;
+
+          var obj = findDevice(relation.receiverShort, fileList.getList('deviceList'), 'shortAddress');
+          var state = null;
+          // determine state
+          if (obj) {
+            if (relation.rEP == RelationClass.LEFT_EP_SOCKET) {
+              state = obj.leftState;
+            } else if (relation.rEP == RelationClass.RIGHT_EP_SOCKET) {
+              state = obj.rightState;
+            } else {
+              state = obj.state;
+            }
           } else {
-            console.log('error, turn to toggle');
-            console.log('--- state: ' + obj.state);
-            zigbee.custToggleLight(fileList.relationList[i].receiverShort);
+            console.log('can not find device, please make sure if it is still online')
           }
 
+          relationsToTrigger.push({ relation: relation, state: state });
 
-          fileList.writeList(fileList.DEVICE_LIST, fileList.deviceList);
-          console.log('--- relation triggered: ' + fileList.relationList[i].name);
+          // send command according to state (toggle when state is not available)
+
         }
       }
+      break;
+    default:
+      break;
+    // add more cases if available
+  }// end of switch
+
+  function controlLight(obj) {
+    //var obj = devicesToTrigger.shift();
+    if (obj) {
+      if (obj.state == DeviceClass.OFF) {
+        console.log('--- light on triggered');
+        zigbee.custTurnLightOn(obj.relation.receiverShort, obj.relation.rEP);
+      } else if (obj.state == DeviceClass.ON) {
+        console.log('--- light off triggered');
+        zigbee.custTurnLightOff(obj.relation.receiverShort, obj.relation.rEP);
+      } else {
+        console.log('error, turn to toggle');
+        zigbee.custToggleLight(obj.relation.receiverShort, obj.relation.rEP);
+        console.log('error when checking state');
+      }
+    }
   }
+  function loopRelation() {
+    var relationItem = relationsToTrigger.shift();
+    controlLight(relationItem);
+
+    if (relationsToTrigger.length > 0) {
+      setTimeout(function () {
+        loopRelation();
+      }, DELAY_TIME);
+    }
+  }
+  loopRelation();
 }
 
-//=======================
+// read messages
 function readMessage(msg) {
   var obj = {};
   var myDevice = {};
 
   switch (msg.msgType) {
     case 'Leave Indication':
-      obj = findDevice(msg, fileList.deviceList);
+      obj = findDevice(msg, fileList.getList('deviceList'));
       leaveDevice(obj);
       break;
 
     case 'Device Announce':
-      obj = findDevice(msg, fileList.deviceList);
+      obj = findDevice(msg, fileList.getList('deviceList'));
       announceDevice(obj, msg, myDevice);
       console.log('please name your device below by typing \'name\': ');
       break;
 
     case 'Attribute Report':
-      obj = findDevice(msg, fileList.deviceList);
+      obj = findDevice(msg, fileList.getList('deviceList'));
       attributeReportDevice(obj, msg, myDevice);
       attributeControl(msg);
       break;
@@ -308,9 +284,6 @@ function readMessage(msg) {
 
 module.exports = {
   readMessage: readMessage,
-  getOnlineDevices: getOnlineDevices,
   setName: setName,
   setRelation: setRelation,
-  setOnlineDevices: setOnlineDevices,
-  removeOnlineDevices: removeOnlineDevices
 }

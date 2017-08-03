@@ -26,13 +26,11 @@
  */
 'use strict';
 
-//console.log('entered decode------');
-
 var fs = require('fs');
 var EventEmitter = require('events');
 var DeviceClass = require('./device.js');
 var Device = DeviceClass.Device;
-
+var util = require('util');
 var _ = require('./underscore.js');
 
 var emitter = new EventEmitter();
@@ -46,14 +44,12 @@ var STOP = 0x3;
 var ESC = 0x2;
 var MASK = 0x10;
 
-var storedMessage = [];
-
 function formatToUInt16BE(value) {
     var valueBuf = new Buffer(2);
     valueBuf.writeUInt16BE(value, 0);
+    console.log('---===format16BE: ' + valueBuf.toString('hex'));
     return valueBuf;
 }
-
 
 function pack(msgType, msg) {
     var packet = new Buffer(1);
@@ -63,27 +59,28 @@ function pack(msgType, msg) {
     packet = Buffer.concat([packet, stuff(crcCaculate(msgType, msg.length, msg))]);
     packet = Buffer.concat([packet, stuff(msg)]);
     packet = Buffer.concat([packet, Buffer.from([STOP])]);
+
+    console.log('---===packet: ' + packet.toString('hex'));
     return packet;
 }
-
 
 function unpack(rawData) {
     var unstuffedData = unstuff(rawData);
     var slicedData = sliceData(unstuffedData);
-    var entireMessages = storeMessage(slicedData);
     var parsedMessages = [];
-
-    if (entireMessages.length !== 0) {
-        for (var i = 0; i < entireMessages.length; i++) {
-            var protocolContent = parseMessage(entireMessages[i]);
-            var parsedMessage = handleMessage(protocolContent);
-            parsedMessages.push(parsedMessage);
-        }
-    }
-
+    var protocolContent = parseMessage(slicedData);
+    var parsedMessage = handleMessage(protocolContent);
+    console.log('parsed message: ' + util.inspect(parsedMessage, {
+        depth: 12
+    }));
+    parsedMessages.push(parsedMessage);
+    console.log('parsed messages: ' + util.inspect(parsedMessages, {
+        depth: 12
+    }));
     return parsedMessages;
 }
 
+// mask message and push into buffer
 function stuff(buffer) {
     var packet = [];
     for (var i = 0; i < buffer.length; i++) {
@@ -97,7 +94,7 @@ function stuff(buffer) {
     return Buffer.from(packet);
 }
 
-// unstuff raw data to meaningful data(Buffer type)
+// unmask raw data to meaningful data (Buffer type)
 function unstuff(buffer) {
     var packet = [];
     for (var i = 0; i < buffer.length; i++) {
@@ -112,7 +109,15 @@ function unstuff(buffer) {
 }
 
 function crcCaculate(msgType, msgLen, msg) {
-    var crcResult = msgType ^ msgLen;
+    //var crcResult = msgType ^ msgLen;
+
+    var crcResult = 0x00;
+
+    crcResult ^= (msgType & 0xff00) >> 8;
+    crcResult ^= (msgType & 0x00ff);
+    crcResult ^= (msgLen & 0xff00) >> 8;
+    crcResult ^= (msgLen & 0x00ff);
+
     for (var i = 0; i < msg.length; i++) {
         crcResult ^= msg[i];
     }
@@ -138,24 +143,7 @@ function sliceData(data) {
     return slicedData;
 }
 
-// store uart read message into cache array
-function storeMessage(data) {
-    storedMessage = storedMessage.concat(data);
-    var messages = [];
-    while (storedMessage.length > 0) {
-        var firstEndIndex = storedMessage.indexOf('03');
-        if (firstEndIndex !== -1) {
-            var entireMessage = storedMessage.slice(0, firstEndIndex + 1);
-            storedMessage = storedMessage.slice(firstEndIndex + 1);
-            messages.push(entireMessage);
-        } else {
-            break;
-        }
-    }
-    return messages;
-}
-
-// parse message into zigbee protocol segment
+// parse message and store as zigbee protocol segment
 function parseMessage(msg) {
     var protocolContent = { valid: false };
     if (msg[0] === '01' && msg[msg.length - 1] === '03') {
@@ -174,7 +162,6 @@ function handleMessage(message) {
         switch (message.MsgType) {
             case '0x004d':
                 handledMessage = handleDeviceAnnounce(message.MsgContent);
-                //deviceList.push(handledMessage);
                 break;
             case '0x8000':
                 handledMessage = handleStatusResponse(message.MsgContent);
@@ -195,44 +182,27 @@ function handleMessage(message) {
                 handledMessage = handleVersionList(message.MsgContent);
                 break;
             case '0x8101':
-              handledMessage = handleDefaultResponse(message.MsgContent);
+                handledMessage = handleDefaultResponse(message.MsgContent);
                 break;
             case '0x8102':
                 handledMessage = handleAttributeReport(message.MsgContent);
-                //sendControlCommand(handledMessage);
+                break;
+            case '0x8100':
+                handledMessage = handleReadAttributeResponse(message.MsgContent);
+                //return handleReadAttributeResponse(message.MsgContent);
                 break;
             case '0x8024':
                 handledMessage = handleNetworkJoinedOrFormed(message.MsgContent);
                 break;
             case '0x8048':
                 handledMessage = handleLeaveIndication(message.MsgContent);
-                // removeDevice(handledMessage.extendedAddress);
                 break;
             default:
                 console.log(message);
         }
-        console.log('handled message: ', handledMessage);
     }
     return handledMessage;
 }
-
-// function sendControlCommand(attrRepo) {
-//     var data = attrRepo.responseData || attrRepo.status;
-//     switch (data) {
-//         case '0x00':
-//             if (!isDeviceJoined(attrRepo.shortAddress)) {
-//                 emitter.emit('toggle light');
-//             }
-//             break;
-//         case '0x01':
-//             if (isDeviceJoined(attrRepo.shortAddress)) {
-//                 emitter.emit('turn light on');
-//             }
-//             break;
-//         default:
-//             break;
-//     }
-// }
 
 // hex to ascii
 function stringifyMessage(msg) {
@@ -254,6 +224,8 @@ function getEntries(msg, entryLength) {
 }
 
 function handleAttributeReport(msg) {
+
+    console.log('attribute handle: ' + msg.toString('hex'));
     var result = {};
     result.msgType = 'Attribute Report';
     result.sequenceNumber = ('0x' + msg[0]);
@@ -271,6 +243,26 @@ function handleAttributeReport(msg) {
         result.attributeData = '0x' + msg.slice(11, -1).join('');
         result.status = '0x' + msg[msg.length - 1];
     }
+    return result;
+}
+
+function handleReadAttributeResponse(msg) {
+    console.log('read attribute response triggered');
+    console.log('attribute resp handle: ' + msg.toString('hex'));
+
+    var result = {};
+    result.msgType = 'Read Attribute Report';
+    result.sequenceNumber = ('0x' + msg[0]);
+    result.shortAddress = ('0x' + msg[1] + msg[2]);
+    result.endPoint = ('0x' + msg[3]);
+    result.clusterID = ('0x' + msg[4] + msg[5]);
+    result.attributeID = ('0x' + msg[6] + msg[7]);
+    result.attributeStatus = ('0x' + msg[8]);
+    result.attributeType = ('0x' + msg[9]);
+    result.attributeSize = ('0x' + msg[10] + msg[11]);
+    result.status = ('0x' + msg[12]);
+
+    console.log(result);
     return result;
 }
 
@@ -372,8 +364,6 @@ function handleDeviceAnnounce(msg) {
     result.macCapability = Number('0x' + msg[10]).toString(2);
     return result;
 }
-
-//console.log('before exports=======');
 
 module.exports = {
     pack: pack,

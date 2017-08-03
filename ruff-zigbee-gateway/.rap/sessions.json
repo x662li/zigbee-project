@@ -39,6 +39,80 @@
             "name": "192.168.1.102",
             "board": "sg-mbd-v1",
             "address": "192.168.1.102"
+        },
+        "ruffd/lan/192.168.1.103": {
+            "name": "192.168.1.103",
+            "board": "sg-mbd-v1",
+            "address": "192.168.1.103"
+        },
+        "ruffd/lan/192.168.1.104": {
+            "name": "192.168.1.104",
+            "board": "sg-mbd-v1",
+            "address": "192.168.1.104"
         }
+    },
+    "ruff": {
+        "sessions": [
+            {
+                "name": "ruffd/lan/192.168.30.100",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.30.100"
+            },
+            {
+                "name": "ruffd/lan/192.168.31.150",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.31.150"
+            },
+            {
+                "name": "ruffd/lan/192.168.30.103",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.30.103"
+            },
+            {
+                "name": "ruffd/lan/192.168.30.101",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.30.101"
+            },
+            {
+                "name": "ruffd/lan/192.168.30.104",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.30.104"
+            },
+            {
+                "name": "ruffd/lan/192.169.30.101",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.169.30.101"
+            },
+            {
+                "name": "ruffd/lan/192.168.1.100",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.1.100"
+            },
+            {
+                "name": "ruffd/lan/192.168.1.102",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.1.102"
+            },
+            {
+                "name": "ruffd/lan/192.168.1.103",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.1.103"
+            },
+            {
+                "name": "ruffd/lan/192.168.1.104",
+                "board": "sg-mbd-v1",
+                "isActive": false,
+                "address": "192.168.1.104"
+            }
+        ]
     }
 }
